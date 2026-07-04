@@ -1,0 +1,86 @@
+{% extends "base/base.html" %}
+{% load static humanize %}
+
+{% block title %}Chunks — {{ document.title }}{% endblock %}
+{% block page_title %}Chunks: {{ document.title|truncatechars:50 }}{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'document_upload:list' %}">Documents</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'document_upload:detail' document.pk %}">{{ document.title|truncatechars:30 }}</a></li>
+  <li class="breadcrumb-item active">Chunks</li>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col-md-3">
+    <div class="info-box"><span class="info-box-icon bg-primary"><i class="fas fa-puzzle-piece"></i></span>
+      <div class="info-box-content"><span class="info-box-text">Total Chunks</span>
+        <span class="info-box-number">{{ page_obj.paginator.count|intcomma }}</span></div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="info-box"><span class="info-box-icon bg-success"><i class="fas fa-vector-square"></i></span>
+      <div class="info-box-content"><span class="info-box-text">Embedded</span>
+        <span class="info-box-number">{{ document.chunks.filter.is_embedded }}</span></div></div>
+  </div>
+  <div class="col-md-6 d-flex align-items-center justify-content-end">
+    {% if request.user.is_staff %}
+    <form method="post" action="{% url 'embedding_service:reindex' document.pk %}"
+          onsubmit="return confirm('Re-index this document? Existing vectors will be cleared.')">
+      {% csrf_token %}
+      <button class="btn btn-warning"><i class="fas fa-sync mr-1"></i>Re-index</button>
+    </form>
+    {% endif %}
+    <a href="{% url 'document_upload:detail' document.pk %}" class="btn btn-outline-secondary ml-2">
+      <i class="fas fa-arrow-left mr-1"></i>Back to Document
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3 class="card-title"><i class="fas fa-list mr-2"></i>Chunk Inspector</h3></div>
+  <div class="card-body p-0" style="max-height:700px;overflow-y:auto;">
+    {% for chunk in page_obj %}
+    <div class="p-3 border-bottom {% if not chunk.is_embedded %}bg-light{% endif %}">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <span class="badge badge-secondary mr-1">#{{ chunk.chunk_index }}</span>
+          {% if chunk.page_number %}<span class="badge badge-light mr-1">Page {{ chunk.page_number }}</span>{% endif %}
+          <span class="badge badge-{% if chunk.is_embedded %}success{% else %}warning{% endif %}">
+            {% if chunk.is_embedded %}<i class="fas fa-check mr-1"></i>Embedded{% else %}Not embedded{% endif %}
+          </span>
+        </div>
+        <span class="text-muted small">{{ chunk.token_count }} tokens &bull; {{ chunk.strategy_used }}</span>
+      </div>
+      <pre class="mb-0" style="white-space:pre-wrap;font-size:0.8rem;font-family:'Inter',sans-serif;max-height:150px;overflow:hidden;color:#495057;">{{ chunk.text|truncatechars:600 }}</pre>
+      {% if chunk.is_embedded %}
+      <div class="mt-1">
+        <small class="text-muted">
+          <i class="fas fa-brain mr-1"></i>
+          {% with emb=chunk.embedding %}
+            {% if emb %}Model: {{ emb.model_name }} &bull; {{ emb.vector_dimensions }}d &bull; {{ emb.generation_time_ms|floatformat:1 }}ms{% endif %}
+          {% endwith %}
+        </small>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+      <i class="fas fa-puzzle-piece fa-3x mb-3 d-block"></i>
+      No chunks yet. The document may still be processing.
+    </div>
+    {% endfor %}
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="card-footer clearfix">
+    <ul class="pagination pagination-sm m-0 float-right">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a></li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

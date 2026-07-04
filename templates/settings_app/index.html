@@ -1,0 +1,310 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Settings{% endblock %}
+{% block page_title %}Platform Settings{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active">Settings</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+
+  <!-- LEFT: AI / RAG configuration -->
+  <div class="col-md-7">
+
+    <!-- Agent Configuration -->
+    <div class="card card-primary card-outline">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-robot mr-2"></i>AI Agent Configuration</h3>
+      </div>
+      <div class="card-body">
+        {% if agent_config %}
+        <form method="post" action="{% url 'settings_app:save_agent' %}">
+          {% csrf_token %}
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>LLM Model</label>
+                <select name="llm_model" class="form-control">
+                  {% for m in ai_models %}
+                  {% if m.model_type == 'llm' or m.model_type == 'reasoning' %}
+                  <option value="{{ m.pk }}"
+                    {% if agent_config.llm_model_id == m.pk %}selected{% endif %}>
+                    {{ m.display_name }}
+                  </option>
+                  {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Embedding Model</label>
+                <select name="embedding_model" class="form-control">
+                  {% for m in ai_models %}
+                  {% if m.model_type == 'embedding' %}
+                  <option value="{{ m.pk }}"
+                    {% if agent_config.embedding_model_id == m.pk %}selected{% endif %}>
+                    {{ m.display_name }}
+                  </option>
+                  {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <h6 class="text-muted mb-3 mt-2"><i class="fas fa-search mr-1"></i>Retrieval</h6>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Top-K Chunks</label>
+                <input type="number" name="top_k" class="form-control"
+                       value="{{ agent_config.top_k }}" min="1" max="20">
+                <small class="text-muted">Chunks retrieved per query</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Similarity Threshold</label>
+                <input type="number" name="similarity_threshold" class="form-control"
+                       value="{{ agent_config.similarity_threshold }}"
+                       min="0" max="1" step="0.05">
+                <small class="text-muted">0.0 = all results</small>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label>Max Context Tokens</label>
+                <input type="number" name="max_context_tokens" class="form-control"
+                       value="{{ agent_config.max_context_tokens }}" min="500" max="32000">
+              </div>
+            </div>
+          </div>
+          <div class="custom-control custom-switch mb-3">
+            <input type="checkbox" class="custom-control-input" id="enableReranking"
+                   name="enable_reranking"
+                   {% if agent_config.enable_reranking %}checked{% endif %}>
+            <label class="custom-control-label" for="enableReranking">
+              Enable re-ranking (slower, more accurate)
+            </label>
+          </div>
+
+          <h6 class="text-muted mb-3 mt-2"><i class="fas fa-sliders-h mr-1"></i>LLM Parameters</h6>
+          <div class="row">
+            <div class="col-md-3">
+              <div class="form-group">
+                <label>Temperature</label>
+                <input type="number" name="temperature" class="form-control"
+                       value="{{ agent_config.temperature }}" min="0" max="2" step="0.05">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-group">
+                <label>Top P</label>
+                <input type="number" name="top_p" class="form-control"
+                       value="{{ agent_config.top_p }}" min="0" max="1" step="0.05">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-group">
+                <label>Top K</label>
+                <input type="number" name="top_k_llm" class="form-control"
+                       value="{{ agent_config.top_k_llm }}" min="1" max="200">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-group">
+                <label>Max Tokens</label>
+                <input type="number" name="max_tokens" class="form-control"
+                       value="{{ agent_config.max_tokens }}" min="64" max="8192">
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save mr-1"></i>Save Agent Config
+          </button>
+        </form>
+        {% else %}
+        <div class="alert alert-warning">
+          No active agent configuration. Run:
+          <code>python manage.py seed_ai_config</code>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Platform Settings (key/value) -->
+    {% for cat in categories %}
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="fas fa-cog mr-2 text-muted"></i>{{ cat.name }}
+        </h3>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light">
+            <tr><th style="width:35%">Key</th><th>Value</th><th>Type</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for s in cat.settings.all %}
+            <tr>
+              <td>
+                <code class="small">{{ s.key }}</code>
+                {% if s.description %}
+                <i class="fas fa-info-circle text-muted ml-1" title="{{ s.description }}"></i>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.is_editable %}
+                <form method="post" action="{% url 'settings_app:save' %}"
+                      class="d-flex gap-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="key" value="{{ s.key }}">
+                  <input type="{{ s.is_sensitive|yesno:'password,text' }}"
+                         name="value"
+                         class="form-control form-control-sm"
+                         value="{% if not s.is_sensitive %}{{ s.value }}{% endif %}"
+                         {% if s.is_sensitive %}placeholder="(hidden)"{% endif %}>
+                  <button type="submit" class="btn btn-sm btn-outline-primary ml-1">
+                    <i class="fas fa-save"></i>
+                  </button>
+                </form>
+                {% else %}
+                <code class="small text-muted">{{ s.value|truncatechars:60 }}</code>
+                <span class="badge badge-secondary ml-1">read-only</span>
+                {% endif %}
+              </td>
+              <td><span class="badge badge-light">{{ s.data_type }}</span></td>
+              <td>
+                {% if s.is_sensitive %}
+                <i class="fas fa-lock text-muted" title="Sensitive"></i>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-info">
+      No platform settings configured yet.
+      <a href="{% url 'admin:settings_app_platformsetting_add' %}">Add settings from Django Admin</a>.
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- RIGHT: AI models list + Ollama status -->
+  <div class="col-md-5">
+
+    <!-- Ollama status widget -->
+    <div class="card card-outline card-primary">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-server mr-2"></i>Ollama Status</h3>
+        <div class="card-tools">
+          <span id="ollamaStatusBadge" class="badge badge-secondary">Checking…</span>
+        </div>
+      </div>
+      <div class="card-body" id="ollamaBody">
+        <p class="text-muted small">Checking connection to Ollama…</p>
+      </div>
+    </div>
+
+    <!-- Available AI models -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title"><i class="fas fa-brain mr-2"></i>AI Models</h3>
+        <a href="{% url 'admin:ai_agent_aimodel_add' %}" class="btn btn-xs btn-primary">
+          <i class="fas fa-plus"></i>
+        </a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light">
+            <tr><th>Model</th><th>Type</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for m in ai_models %}
+            <tr>
+              <td>
+                <strong class="small">{{ m.display_name }}</strong>
+                <div class="text-muted" style="font-size:.75rem;">{{ m.name }}</div>
+              </td>
+              <td><span class="badge badge-light">{{ m.get_model_type_display }}</span></td>
+              <td>
+                {% if m.is_default %}
+                <span class="badge badge-success">Default</span>
+                {% else %}
+                <span class="badge badge-secondary">Available</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-3">
+              No models registered. Run <code>manage.py seed_ai_config</code>.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Chunking info -->
+    <div class="card card-info card-outline">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-puzzle-piece mr-2"></i>Chunking Strategies</h3>
+      </div>
+      <div class="card-body small">
+        {% for s in chunking_strats %}
+        <div class="d-flex align-items-center mb-2">
+          <i class="fas fa-check-circle text-success mr-2"></i>
+          <strong class="text-capitalize">{{ s }}</strong>
+        </div>
+        {% endfor %}
+        <p class="text-muted mt-2 mb-0">
+          Change the active strategy via PlatformSetting key
+          <code>chunking.strategy</code>.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+fetch("{% url 'ai_agent:health_check' %}")
+  .then(r => r.json())
+  .then(data => {
+    const badge = document.getElementById('ollamaStatusBadge');
+    const body  = document.getElementById('ollamaBody');
+    if (data.ollama_online) {
+      badge.className   = 'badge badge-success';
+      badge.textContent = 'Online';
+      const models = data.models || [];
+      body.innerHTML = `
+        <p class="text-success mb-2"><i class="fas fa-check-circle mr-1"></i>
+          Ollama is running at <code>{{ request.user }}</code></p>
+        <p class="small text-muted mb-1">${models.length} model(s) available locally:</p>
+        <ul class="mb-0 small">${models.map(m => `<li><code>${m}</code></li>`).join('')}</ul>`;
+    } else {
+      badge.className   = 'badge badge-danger';
+      badge.textContent = 'Offline';
+      body.innerHTML    = `
+        <p class="text-danger mb-2"><i class="fas fa-times-circle mr-1"></i>
+          Ollama is not running.</p>
+        <p class="small text-muted mb-1">Start it with:</p>
+        <code>ollama serve</code>`;
+    }
+  })
+  .catch(() => {
+    document.getElementById('ollamaStatusBadge').className = 'badge badge-danger';
+    document.getElementById('ollamaStatusBadge').textContent = 'Error';
+  });
+</script>
+{% endblock %}

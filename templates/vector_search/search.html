@@ -1,0 +1,257 @@
+{% extends "base/base.html" %}
+{% load static humanize %}
+
+{% block title %}Search{% endblock %}
+{% block page_title %}Knowledge Base Search{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active">Search</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.search-hero { background:linear-gradient(135deg,#4361ee,#7209b7);
+               border-radius:16px; padding:40px 32px; margin-bottom:28px; color:#fff; }
+.search-hero h2 { font-size:1.6rem; font-weight:700; margin-bottom:8px; }
+.search-hero p  { opacity:.8; margin:0; }
+.search-box { display:flex; gap:0; margin-top:24px; }
+.search-box input { flex:1; border-radius:12px 0 0 12px; border:none; padding:14px 18px;
+                    font-size:1rem; outline:none; }
+.search-box .kb-select { border:none; border-left:1px solid #dee2e6; padding:0 12px;
+                          font-size:.9rem; min-width:160px; background:#f8f9fa; }
+.search-box button { border-radius:0 12px 12px 0; padding:14px 24px; border:none;
+                     background:#06d6a0; color:#fff; font-weight:600; cursor:pointer;
+                     transition:background .2s; }
+.search-box button:hover { background:#04b884; }
+
+.result-card { border:none; border-radius:12px;
+               box-shadow:0 2px 12px rgba(0,0,0,.07); margin-bottom:16px;
+               transition:transform .15s, box-shadow .15s; }
+.result-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,.1); }
+.result-card .card-header { background:transparent; border-bottom:1px solid #f0f0f0;
+                             padding:14px 20px; }
+.score-badge { font-size:.85rem; font-weight:700; padding:4px 10px;
+               border-radius:20px; }
+.score-high   { background:#d4f8e8; color:#0a7d4f; }
+.score-medium { background:#fff3cd; color:#856404; }
+.score-low    { background:#f8d7da; color:#842029; }
+
+.chunk-text { font-size:.875rem; line-height:1.6; color:#444;
+              border-left:3px solid #4361ee; padding-left:14px;
+              margin:0; max-height:160px; overflow:hidden;
+              transition:max-height .3s ease; }
+.chunk-text.expanded { max-height:none; }
+.expand-btn { font-size:.78rem; color:#4361ee; cursor:pointer; background:none;
+              border:none; padding:4px 0; }
+
+.stats-bar { display:flex; gap:20px; flex-wrap:wrap; font-size:.82rem;
+             color:#6c757d; margin-bottom:20px; }
+.stats-bar span { display:flex; align-items:center; gap:5px; }
+
+.no-results { text-align:center; padding:60px 20px; color:#6c757d; }
+.no-results i { font-size:3.5rem; margin-bottom:16px; display:block; opacity:.3; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Search hero -->
+<div class="search-hero">
+  <h2><i class="fas fa-search mr-2"></i>Semantic Search</h2>
+  <p>Search across all indexed documents using AI-powered similarity matching.</p>
+  <form method="get" action="{% url 'vector_search:search' %}" id="searchForm">
+    <div class="search-box">
+      <input type="text" name="q" id="searchInput"
+             value="{{ query }}"
+             placeholder="Ask a question or enter keywords…"
+             autocomplete="off" autofocus>
+      <select name="kb" class="kb-select">
+        <option value="">All knowledge bases</option>
+        {% for kb in knowledge_bases %}
+        <option value="{{ kb.pk }}" {% if selected_kb == kb.pk|stringformat:"s" %}selected{% endif %}>
+          {{ kb.name }}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit"><i class="fas fa-search mr-1"></i>Search</button>
+    </div>
+    <div class="d-flex gap-3 mt-3 flex-wrap">
+      <div class="custom-control custom-switch">
+        <input type="checkbox" class="custom-control-input" id="liveSearch" checked>
+        <label class="custom-control-label text-white-50" for="liveSearch">Live search</label>
+      </div>
+      <select name="top_k" class="form-control form-control-sm"
+              style="width:120px;background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)">
+        <option value="5"  {% if request.GET.top_k == "5"  or not request.GET.top_k %}selected{% endif %}>Top 5</option>
+        <option value="10" {% if request.GET.top_k == "10" %}selected{% endif %}>Top 10</option>
+        <option value="20" {% if request.GET.top_k == "20" %}selected{% endif %}>Top 20</option>
+      </select>
+    </div>
+  </form>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">
+  <i class="fas fa-exclamation-triangle mr-2"></i>
+  {{ error }}
+  {% if "Ollama" in error %}
+  <br><small>Start Ollama with: <code>ollama serve</code></small>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if query %}
+
+  {% if results and results.has_results %}
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <span><i class="fas fa-layer-group"></i> <strong>{{ results.chunks|length }}</strong> results</span>
+    <span><i class="fas fa-clock"></i> Embed: <strong>{{ results.embedding_time_ms|floatformat:0 }}ms</strong></span>
+    <span><i class="fas fa-bolt"></i> Search: <strong>{{ results.search_time_ms|floatformat:0 }}ms</strong></span>
+    {% if results.chunks %}
+    <span><i class="fas fa-chart-bar"></i>
+      Best score: <strong>{{ results.chunks.0.final_score|floatformat:3 }}</strong>
+    </span>
+    {% endif %}
+    <a href="{% url 'chat:index' %}" class="ml-auto btn btn-sm btn-outline-primary">
+      <i class="fas fa-comments mr-1"></i>Ask AI about this
+    </a>
+  </div>
+
+  <!-- Result cards -->
+  {% for rc in results.chunks %}
+  {% with score=rc.final_score %}
+  <div class="card result-card">
+    <div class="card-header d-flex justify-content-between align-items-start">
+      <div>
+        <span class="badge badge-secondary mr-2">#{{ rc.rank }}</span>
+        <strong>
+          <a href="{% url 'document_upload:detail' rc.document.pk %}" class="text-dark">
+            {{ rc.document.title|truncatechars:70 }}
+          </a>
+        </strong>
+        <div class="text-muted small mt-1">
+          <i class="fas fa-file-alt mr-1"></i>{{ rc.document.original_filename|truncatechars:50 }}
+          &bull; <i class="fas fa-book-open mr-1"></i>
+          {{ rc.document.knowledge_base.name }}
+          {% if rc.chunk.page_number %}
+          &bull; Page {{ rc.chunk.page_number }}
+          {% endif %}
+          {% if rc.chunk.paragraph_number %}
+          &bull; Para {{ rc.chunk.paragraph_number }}
+          {% endif %}
+        </div>
+      </div>
+      <span class="score-badge {% if score >= 0.7 %}score-high{% elif score >= 0.4 %}score-medium{% else %}score-low{% endif %}">
+        {{ score|floatformat:3 }}
+      </span>
+    </div>
+    <div class="card-body">
+      <p class="chunk-text" id="text-{{ forloop.counter }}">{{ rc.chunk.text }}</p>
+      {% if rc.chunk.text|length > 300 %}
+      <button class="expand-btn" onclick="toggleText('{{ forloop.counter }}', this)">
+        <i class="fas fa-chevron-down mr-1"></i>Show more
+      </button>
+      {% endif %}
+      <div class="mt-3 d-flex gap-2 flex-wrap">
+        <a href="{% url 'document_upload:detail' rc.document.pk %}"
+           class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-eye mr-1"></i>View Document
+        </a>
+        <a href="{% url 'embedding_service:chunk_list' rc.document.pk %}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="fas fa-puzzle-piece mr-1"></i>All Chunks
+        </a>
+        <button class="btn btn-sm btn-outline-success"
+                onclick="askAI('{{ rc.chunk.text|truncatechars:200|escapejs }}')">
+          <i class="fas fa-comments mr-1"></i>Ask AI
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+
+  {% else %}
+  <div class="no-results">
+    <i class="fas fa-search-minus"></i>
+    <h4>No results found for "{{ query }}"</h4>
+    <p>Try different keywords, or check that your documents are indexed.</p>
+    <a href="{% url 'document_upload:upload' %}" class="btn btn-primary mt-3">
+      <i class="fas fa-upload mr-1"></i>Upload Documents
+    </a>
+  </div>
+  {% endif %}
+
+{% else %}
+<!-- Idle state — suggestions -->
+<div class="row mt-2">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">
+        <i class="fas fa-lightbulb mr-2 text-warning"></i>Search Tips
+      </h3></div>
+      <div class="card-body">
+        <ul class="mb-0">
+          <li>Ask natural language questions: <em>"What is the refund policy?"</em></li>
+          <li>Use keywords: <em>quarterly revenue Q3 2024</em></li>
+          <li>Filter by Knowledge Base to scope results</li>
+          <li>Higher score (closer to 1.0) = more relevant</li>
+          <li>For conversational follow-ups, use the <a href="{% url 'chat:index' %}">Chat</a> page</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card card-info card-outline">
+      <div class="card-header"><h3 class="card-title">
+        <i class="fas fa-chart-pie mr-2"></i>Index Stats
+      </h3></div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <span>Documents indexed</span>
+          <strong>{{ document_count|default:"—" }}</strong>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span>Total chunks</span>
+          <strong>{{ chunk_count|default:"—" }}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Expand/collapse chunk text
+function toggleText(id, btn) {
+  const el = document.getElementById('text-' + id);
+  const expanded = el.classList.toggle('expanded');
+  btn.innerHTML = expanded
+    ? '<i class="fas fa-chevron-up mr-1"></i>Show less'
+    : '<i class="fas fa-chevron-down mr-1"></i>Show more';
+}
+
+// Send chunk text to chat
+function askAI(text) {
+  // Store in sessionStorage, redirect to new chat
+  sessionStorage.setItem('kb_prefill_question', text);
+  window.location.href = "{% url 'chat:index' %}";
+}
+
+// Live search (debounced)
+let debounce;
+const liveToggle = document.getElementById('liveSearch');
+document.getElementById('searchInput').addEventListener('input', function() {
+  if (!liveToggle.checked) return;
+  clearTimeout(debounce);
+  debounce = setTimeout(() => {
+    if (this.value.trim().length >= 3) {
+      document.getElementById('searchForm').submit();
+    }
+  }, 600);
+});
+</script>
+{% endblock %}

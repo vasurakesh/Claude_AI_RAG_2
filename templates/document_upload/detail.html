@@ -1,0 +1,144 @@
+{% extends "base/base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ document.title }}{% endblock %}
+{% block page_title %}{{ document.title|truncatechars:60 }}{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'document_upload:list' %}">Documents</a></li>
+  <li class="breadcrumb-item active">{{ document.title|truncatechars:40 }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+
+  <!-- Left: metadata + pipeline status -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-info-circle mr-2"></i>Document Info</h3>
+        <div class="card-tools">
+          <span class="badge badge-{% if document.status == 'indexed' %}success{% elif document.status == 'failed' %}danger{% else %}warning{% endif %}" id="statusBadge">
+            {{ document.get_status_display }}
+          </span>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr><th>Knowledge Base</th><td>{{ document.knowledge_base.name }}</td></tr>
+          <tr><th>File Name</th><td><small>{{ document.original_filename }}</small></td></tr>
+          <tr><th>Type</th><td>{{ document.get_file_category_display }} ({{ document.extension }})</td></tr>
+          <tr><th>Size</th><td>{{ document.file_size|filesizeformat }}</td></tr>
+          <tr><th>Pages</th><td>{{ document.page_count|default:"—" }}</td></tr>
+          <tr><th>Words</th><td>{{ document.word_count|intcomma|default:"—" }}</td></tr>
+          <tr><th>Language</th><td>{{ document.language|default:"—" }}</td></tr>
+          <tr><th>Author</th><td>{{ document.author|default:"—" }}</td></tr>
+          <tr><th>OCR</th><td>{% if document.requires_ocr %}<span class="badge badge-info">Yes</span>{% else %}No{% endif %}</td></tr>
+          <tr><th>SHA-256</th><td><small class="text-muted">{{ document.sha256_hash|truncatechars:20 }}</small></td></tr>
+          <tr><th>Uploaded</th><td>{{ document.created_at|date:"M j, Y H:i" }}</td></tr>
+          <tr><th>Uploaded by</th><td>{{ document.created_by.username|default:"—" }}</td></tr>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="{% url 'document_upload:delete' document.pk %}"
+              onsubmit="return confirm('Delete this document? This cannot be undone.')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-danger">
+            <i class="fas fa-trash mr-1"></i>Delete
+          </button>
+          <a href="{% url 'embedding_service:chunk_list' document.pk %}" class="btn btn-sm btn-outline-info ml-1">
+            <i class="fas fa-puzzle-piece mr-1"></i>View Chunks
+          </a>
+          <a href="{% url 'document_upload:list' %}" class="btn btn-sm btn-outline-secondary ml-1">
+            <i class="fas fa-arrow-left mr-1"></i>Back
+          </a>
+        </form>
+      </div>
+    </div>
+
+    <!-- Pipeline status steps -->
+    <div class="card">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-tasks mr-2"></i>Pipeline Status</h3></div>
+      <div class="card-body p-0">
+        {% with s=document.status %}
+        {% for step_status, step_label in document.Status.choices %}
+        <div class="d-flex align-items-center p-2 border-bottom">
+          <span class="mr-3">
+            {% if step_status == 'failed' %}
+              <i class="fas fa-times-circle text-danger"></i>
+            {% elif step_status == s or step_status == 'indexed' and s == 'indexed' %}
+              <i class="fas fa-check-circle text-success"></i>
+            {% elif document.is_indexed %}
+              <i class="fas fa-check-circle text-success"></i>
+            {% else %}
+              <i class="far fa-circle text-muted"></i>
+            {% endif %}
+          </span>
+          <span class="{% if step_status == s %}font-weight-bold{% endif %}">{{ step_label }}</span>
+        </div>
+        {% endfor %}
+        {% endwith %}
+      </div>
+    </div>
+
+    {% if document.processing_error %}
+    <div class="alert alert-danger">
+      <h6><i class="fas fa-exclamation-triangle mr-1"></i>Processing Error</h6>
+      <small><code>{{ document.processing_error }}</code></small>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: page text preview -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title"><i class="fas fa-align-left mr-2"></i>Extracted Text Preview</h3>
+        <span class="text-muted small">Showing {{ pages|length }} of {{ total_pages }} page(s)</span>
+      </div>
+      <div class="card-body p-0" style="max-height:600px;overflow-y:auto;">
+        {% for page in pages %}
+        <div class="p-3 border-bottom">
+          <div class="d-flex justify-content-between mb-2">
+            <strong class="text-muted small">PAGE {{ page.page_number }}</strong>
+            <span>
+              {% if page.is_ocr %}<span class="badge badge-info mr-1">OCR</span>{% endif %}
+              <span class="badge badge-light">{{ page.word_count }} words</span>
+            </span>
+          </div>
+          <pre style="white-space:pre-wrap;font-size:0.82rem;font-family:'Inter',sans-serif;max-height:300px;overflow:hidden;">{{ page.raw_text|truncatechars:2000 }}</pre>
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-5">
+          <i class="fas fa-hourglass-half fa-2x mb-3 d-block"></i>
+          {% if document.status == 'pending' or document.status == 'processing' %}
+            Document is being processed…
+          {% elif document.status == 'failed' %}
+            Processing failed — no text was extracted.
+          {% else %}
+            No text content available yet.
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not document.is_indexed and not document.failed %}
+<script>
+// Auto-refresh until indexing completes
+(function poll() {
+  setTimeout(async () => {
+    const r = await fetch('{% url "document_upload:status" document.pk %}');
+    const d = await r.json();
+    document.getElementById('statusBadge').textContent = d.status_label;
+    if (!d.is_indexed && !d.failed) { poll(); }
+    else { location.reload(); }
+  }, 3000);
+})();
+</script>
+{% endif %}
+{% endblock %}

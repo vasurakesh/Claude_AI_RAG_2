@@ -1,0 +1,16 @@
+{% extends "base/base.html" %}
+{% block title %}Coming Soon{% endblock %}
+{% block page_title %}Coming Soon{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 text-center py-5">
+    <i class="fas fa-hard-hat fa-4x text-warning mb-4"></i>
+    <h2>Under Construction</h2>
+    <p class="text-muted">This module will be implemented in a future phase.<br>
+       The models, admin, and database schema are fully in place.</p>
+    <a href="{% url 'dashboard:index' %}" class="btn btn-primary mt-3">
+      <i class="fas fa-home mr-1"></i>Back to Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}

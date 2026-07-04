@@ -1,0 +1,274 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Upload Documents{% endblock %}
+{% block page_title %}Upload Documents{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item"><a href="{% url 'document_upload:list' %}">Documents</a></li>
+  <li class="breadcrumb-item active">Upload</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Drop Zone ── */
+  .dropzone-area {
+    border: 2px dashed #4361ee;
+    border-radius: 16px;
+    background: rgba(67,97,238,0.04);
+    padding: 60px 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+  }
+  .dropzone-area.dragover {
+    border-color: #06d6a0;
+    background: rgba(6,214,160,0.06);
+    transform: scale(1.01);
+  }
+  .dropzone-area .dz-icon { font-size: 3rem; color: #4361ee; margin-bottom: 16px; }
+  .dropzone-area p { color: #6c757d; margin: 0; }
+  .dropzone-area strong { color: #4361ee; }
+  #fileInput { display: none; }
+
+  /* ── File queue list ── */
+  #fileList { margin-top: 20px; }
+  .file-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #e9ecef;
+    transition: background 0.2s;
+  }
+  .file-item .file-icon { font-size: 1.4rem; min-width: 28px; }
+  .file-item .file-name { flex: 1; font-size: 0.9rem; word-break: break-all; }
+  .file-item .file-size { color: #6c757d; font-size: 0.8rem; white-space: nowrap; }
+  .file-item .file-remove { color: #dc3545; cursor: pointer; padding: 0 4px; }
+  .file-item .progress { height: 6px; flex: 1; }
+
+  /* ── Upload progress ── */
+  #uploadProgress { display: none; }
+  .overall-progress { height: 10px; border-radius: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+
+    <!-- Drop zone card -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cloud-upload-alt mr-2 text-primary"></i>Upload Documents</h3>
+        <div class="card-tools">
+          <span class="badge badge-light">
+            Supports: PDF, DOCX, XLSX, CSV, TXT, HTML, RTF, PPTX, PNG, JPG, ZIP
+          </span>
+        </div>
+      </div>
+      <div class="card-body">
+
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+          {% csrf_token %}
+
+          <!-- Knowledge base selector -->
+          <div class="form-group">
+            <label><i class="fas fa-database mr-1"></i>Knowledge Base <span class="text-danger">*</span></label>
+            <select name="knowledge_base" class="form-control" required>
+              <option value="">— Select a knowledge base —</option>
+              {% for kb in form.knowledge_base.field.queryset %}
+              <option value="{{ kb.pk }}">{{ kb.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Drop zone -->
+          <div class="dropzone-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <div class="dz-icon"><i class="fas fa-file-upload"></i></div>
+            <h5>Drag &amp; drop files here</h5>
+            <p>or <strong>click to browse</strong></p>
+            <p class="mt-2 small text-muted">Max 50 MB per file &bull; ZIP archives are auto-extracted</p>
+            <input type="file" id="fileInput" name="files" multiple
+                   accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.html,.rtf,.pptx,.zip,.png,.jpg,.jpeg,.tiff">
+          </div>
+
+          <!-- File queue -->
+          <div id="fileList"></div>
+
+          <!-- Overall progress bar (shown during upload) -->
+          <div id="uploadProgress" class="mt-3">
+            <div class="d-flex justify-content-between mb-1">
+              <small>Uploading…</small>
+              <small id="progressPct">0%</small>
+            </div>
+            <div class="progress overall-progress">
+              <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                   id="progressBar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <!-- Options row -->
+          <div class="row mt-3">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Tags <small class="text-muted">(comma-separated)</small></label>
+                <input type="text" name="tags" class="form-control"
+                       placeholder="e.g. finance, Q3, internal">
+              </div>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+              <div class="custom-control custom-switch mb-3">
+                <input type="checkbox" class="custom-control-input" id="processNow"
+                       name="process_now" checked>
+                <label class="custom-control-label" for="processNow">
+                  Process immediately
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+              <i class="fas fa-upload mr-1"></i>Upload <span id="fileCount">0</span> file(s)
+            </button>
+            <button type="button" class="btn btn-outline-secondary ml-2" id="clearBtn">
+              <i class="fas fa-times mr-1"></i>Clear
+            </button>
+            <a href="{% url 'document_upload:list' %}" class="btn btn-outline-secondary ml-2">
+              <i class="fas fa-list mr-1"></i>View All Documents
+            </a>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: tips -->
+  <div class="col-lg-4">
+    <div class="card card-info card-outline">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-info-circle mr-1"></i>Processing Pipeline</h3></div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          {% for step in steps %}
+          <li class="list-group-item py-2">
+            <i class="fas fa-check-circle text-success mr-2"></i>{{ step }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-warning card-outline">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-lightbulb mr-1"></i>Tips</h3></div>
+      <div class="card-body">
+        <ul class="pl-3 small text-muted">
+          <li>ZIP files are automatically extracted and each file inside is indexed separately.</li>
+          <li>Scanned PDFs and images are processed with Tesseract OCR automatically.</li>
+          <li>Duplicate files (same SHA-256) are silently skipped.</li>
+          <li>Large files are best queued with "Process immediately" unchecked (Phase 8).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ICON_MAP = {
+  pdf: 'fa-file-pdf text-danger', docx: 'fa-file-word text-primary',
+  doc: 'fa-file-word text-primary', xlsx: 'fa-file-excel text-success',
+  xls: 'fa-file-excel text-success', csv: 'fa-file-csv text-info',
+  txt: 'fa-file-alt text-secondary', pptx: 'fa-file-powerpoint text-warning',
+  html: 'fa-file-code text-info', zip: 'fa-file-archive text-dark',
+  png: 'fa-file-image text-purple', jpg: 'fa-file-image text-purple',
+  jpeg: 'fa-file-image text-purple', tiff: 'fa-file-image text-purple',
+};
+
+let selectedFiles = new DataTransfer();
+
+function extIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return ICON_MAP[ext] || 'fa-file text-muted';
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function renderFileList() {
+  const list = document.getElementById('fileList');
+  const count = selectedFiles.files.length;
+  document.getElementById('fileCount').textContent = count;
+  document.getElementById('submitBtn').disabled = count === 0;
+  list.innerHTML = '';
+  Array.from(selectedFiles.files).forEach((f, idx) => {
+    list.innerHTML += `
+      <div class="file-item">
+        <span class="file-icon"><i class="fas ${extIcon(f.name)}"></i></span>
+        <span class="file-name">${f.name}</span>
+        <span class="file-size">${formatBytes(f.size)}</span>
+        <span class="file-remove" onclick="removeFile(${idx})">
+          <i class="fas fa-times-circle"></i>
+        </span>
+      </div>`;
+  });
+}
+
+function removeFile(idx) {
+  const dt = new DataTransfer();
+  Array.from(selectedFiles.files).forEach((f, i) => { if(i !== idx) dt.items.add(f); });
+  selectedFiles = dt;
+  document.getElementById('fileInput').files = selectedFiles.files;
+  renderFileList();
+}
+
+function addFiles(fileList) {
+  Array.from(fileList).forEach(f => selectedFiles.items.add(f));
+  document.getElementById('fileInput').files = selectedFiles.files;
+  renderFileList();
+}
+
+// File input change
+document.getElementById('fileInput').addEventListener('change', e => {
+  addFiles(e.target.files);
+});
+
+// Drag and drop
+const zone = document.getElementById('dropZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', e => { zone.classList.remove('dragover'); });
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  addFiles(e.dataTransfer.files);
+});
+
+// Clear button
+document.getElementById('clearBtn').addEventListener('click', () => {
+  selectedFiles = new DataTransfer();
+  document.getElementById('fileInput').value = '';
+  renderFileList();
+});
+
+// Show progress bar on submit
+document.getElementById('uploadForm').addEventListener('submit', function() {
+  document.getElementById('uploadProgress').style.display = 'block';
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Uploading…';
+  // Animate progress bar (real XHR progress comes in Phase 8 AJAX upload)
+  let pct = 0;
+  const interval = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 15, 90);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+    if (pct >= 90) clearInterval(interval);
+  }, 300);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active">Profile</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <div class="card card-primary card-outline">
+      <div class="card-body box-profile">
+        <div class="text-center">
+          <span style="width:90px;height:90px;border-radius:50%;
+                       background:linear-gradient(135deg,#4361ee,#7209b7);
+                       display:inline-flex;align-items:center;justify-content:center;">
+            <i class="fas fa-user" style="color:#fff;font-size:36px;"></i>
+          </span>
+        </div>
+        <h3 class="profile-username text-center mt-3">
+          {{ request.user.get_full_name|default:request.user.username }}
+        </h3>
+        <p class="text-muted text-center">{{ request.user.email }}</p>
+        <ul class="list-group list-group-unbordered mb-3">
+          <li class="list-group-item">
+            <b>Member Since</b>
+            <span class="float-right">{{ request.user.date_joined|date:"M j, Y" }}</span>
+          </li>
+          <li class="list-group-item">
+            <b>Last Login</b>
+            <span class="float-right">{{ request.user.last_login|date:"M j, Y H:i" }}</span>
+          </li>
+          <li class="list-group-item">
+            <b>Role</b>
+            <span class="float-right">
+              {% if request.user.is_superuser %}
+                <span class="badge badge-danger">Superuser</span>
+              {% elif request.user.is_staff %}
+                <span class="badge badge-warning">Staff</span>
+              {% else %}
+                <span class="badge badge-info">User</span>
+              {% endif %}
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-palette mr-2"></i>Preferences</h3>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{% url 'authentication:profile' %}">
+          {% csrf_token %}
+          <div class="form-group">
+            <label>Theme</label>
+            <div class="d-flex gap-2">
+              <div class="custom-control custom-radio custom-control-inline">
+                <input type="radio" id="themeLight" name="theme" value="light" class="custom-control-input"
+                       {% if request.user.profile.theme == 'light' %}checked{% endif %}>
+                <label class="custom-control-label" for="themeLight">
+                  <i class="fas fa-sun mr-1"></i>Light
+                </label>
+              </div>
+              <div class="custom-control custom-radio custom-control-inline">
+                <input type="radio" id="themeDark" name="theme" value="dark" class="custom-control-input"
+                       {% if request.user.profile.theme == 'dark' %}checked{% endif %}>
+                <label class="custom-control-label" for="themeDark">
+                  <i class="fas fa-moon mr-1"></i>Dark
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="bio">Bio</label>
+            <textarea class="form-control" id="bio" name="bio" rows="3"
+                      placeholder="Tell us about yourself…">{{ request.user.profile.bio }}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save mr-1"></i>Save Preferences
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-key mr-2"></i>Change Password</h3>
+      </div>
+      <div class="card-body">
+        <a href="{% url 'authentication:password_change' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-lock mr-1"></i>Change Password
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

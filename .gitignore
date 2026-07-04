@@ -1,0 +1,43 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/documents/originals/*
+!media/documents/originals/.gitkeep
+media/documents/ocr_text/*
+!media/documents/ocr_text/.gitkeep
+staticfiles/
+
+# Vector store / embeddings (regenerated from source docs)
+vector_store/*
+!vector_store/.gitkeep
+
+# Env / secrets
+.env
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage

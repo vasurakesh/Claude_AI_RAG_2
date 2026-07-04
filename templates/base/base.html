@@ -1,0 +1,318 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ request.user.profile.theme|default:'light' }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}KB Platform{% endblock %} | Knowledge Management AI</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome 5 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+
+  <!-- Bootstrap 4 (AdminLTE 3 dependency) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+
+  <!-- AdminLTE 3 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+
+  <!-- OverlayScrollbars (AdminLTE optional plugin) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@1.13.1/css/OverlayScrollbars.min.css">
+
+  <!-- KB Platform custom CSS -->
+  <link rel="stylesheet" href="{% static 'css/kb_platform.css' %}">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body class="hold-transition sidebar-mini layout-fixed{% if request.user.profile.theme == 'dark' %} dark-mode{% endif %}"
+      data-theme-url="{% url 'authentication:set_theme' %}">
+
+<div class="wrapper">
+
+  <!-- ═══════════════ NAVBAR ═══════════════ -->
+  <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+    <!-- Left: sidebar toggle + breadcrumbs -->
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" data-widget="pushmenu" href="#" role="button">
+          <i class="fas fa-bars"></i>
+        </a>
+      </li>
+      <li class="nav-item d-none d-sm-inline-block">
+        <a href="{% url 'dashboard:index' %}" class="nav-link">
+          <i class="fas fa-home mr-1"></i>Home
+        </a>
+      </li>
+      {% block breadcrumbs %}{% endblock %}
+    </ul>
+
+    <!-- Right: search, notifications, user menu, dark toggle -->
+    <ul class="navbar-nav ml-auto">
+
+      <!-- Global search -->
+      <li class="nav-item">
+        <a class="nav-link" data-widget="navbar-search" href="#" role="button">
+          <i class="fas fa-search"></i>
+        </a>
+        <div class="navbar-search-block">
+          <form class="form-inline" action="{% url 'vector_search:search' %}" method="get">
+            <div class="input-group input-group-sm">
+              <input class="form-control form-control-navbar" type="search"
+                     name="q" placeholder="Search knowledge base…" aria-label="Search">
+              <div class="input-group-append">
+                <button class="btn btn-navbar" type="submit">
+                  <i class="fas fa-search"></i>
+                </button>
+                <button class="btn btn-navbar" type="button" data-widget="navbar-search">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </li>
+
+      <!-- Dark mode toggle -->
+      <li class="nav-item">
+        <a class="nav-link dark-mode-toggle" href="#" onclick="KBPlatform.darkMode.toggle(); return false;"
+           title="Toggle dark mode">
+          <i id="darkModeIcon"
+             class="fas {% if request.user.profile.theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+        </a>
+      </li>
+
+      <!-- User menu -->
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#">
+          <i class="fas fa-user-circle mr-1"></i>
+          <span class="d-none d-md-inline">{{ request.user.get_full_name|default:request.user.username }}</span>
+        </a>
+        <div class="dropdown-menu dropdown-menu-right">
+          <span class="dropdown-item-text text-muted small">
+            Signed in as <strong>{{ request.user.username }}</strong>
+          </span>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item" href="{% url 'authentication:profile' %}">
+            <i class="fas fa-user-cog fa-fw mr-2"></i>My Profile
+          </a>
+          {% if request.user.is_staff %}
+          <a class="dropdown-item" href="{% url 'admin:index' %}">
+            <i class="fas fa-tools fa-fw mr-2"></i>Django Admin
+          </a>
+          {% endif %}
+          <div class="dropdown-divider"></div>
+          <form method="post" action="{% url 'authentication:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item text-danger">
+              <i class="fas fa-sign-out-alt fa-fw mr-2"></i>Sign Out
+            </button>
+          </form>
+        </div>
+      </li>
+
+    </ul>
+  </nav>
+  <!-- ═══════════════ / NAVBAR ═══════════════ -->
+
+  <!-- ═══════════════ SIDEBAR ═══════════════ -->
+  <aside class="main-sidebar sidebar-dark-primary elevation-4">
+
+    <!-- Brand -->
+    <a href="{% url 'dashboard:index' %}" class="brand-link">
+      <span class="brand-image elevation-3"
+            style="background:linear-gradient(135deg,#4361ee,#7209b7);
+                   border-radius:8px;display:inline-flex;align-items:center;
+                   justify-content:center;width:33px;height:33px;">
+        <i class="fas fa-brain" style="color:#fff;font-size:16px;"></i>
+      </span>
+      <span class="brand-text font-weight-bold ml-2">KB Platform</span>
+    </a>
+
+    <div class="sidebar">
+      <!-- User panel -->
+      <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+        <div class="image">
+          <span style="width:34px;height:34px;border-radius:50%;
+                       background:linear-gradient(135deg,#4361ee,#7209b7);
+                       display:inline-flex;align-items:center;justify-content:center;">
+            <i class="fas fa-user" style="color:#fff;font-size:14px;"></i>
+          </span>
+        </div>
+        <div class="info">
+          <a href="{% url 'authentication:profile' %}" class="d-block">
+            {{ request.user.get_full_name|default:request.user.username }}
+          </a>
+        </div>
+      </div>
+
+      <!-- Nav -->
+      <nav class="mt-2">
+        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview"
+            role="menu" data-accordion="false">
+
+          <li class="nav-header">MAIN</li>
+
+          <li class="nav-item">
+            <a href="{% url 'dashboard:index' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
+              <i class="nav-icon fas fa-tachometer-alt"></i>
+              <p>Dashboard</p>
+            </a>
+          </li>
+
+          <li class="nav-header">KNOWLEDGE</li>
+
+          <li class="nav-item">
+            <a href="{% url 'knowledge_base:list' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'knowledge_base' %}active{% endif %}">
+              <i class="nav-icon fas fa-database"></i>
+              <p>Knowledge Bases</p>
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="{% url 'document_upload:list' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'document_upload' %}active{% endif %}">
+              <i class="nav-icon fas fa-file-alt"></i>
+              <p>Documents</p>
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="{% url 'document_upload:upload' %}"
+               class="nav-link {% if request.resolver_match.url_name == 'upload' %}active{% endif %}">
+              <i class="nav-icon fas fa-cloud-upload-alt"></i>
+              <p>Upload</p>
+            </a>
+          </li>
+
+          <li class="nav-header">AI</li>
+
+          <li class="nav-item">
+            <a href="{% url 'chat:index' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'chat' %}active{% endif %}">
+              <i class="nav-icon fas fa-comments"></i>
+              <p>Chat</p>
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="{% url 'vector_search:search' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'vector_search' %}active{% endif %}">
+              <i class="nav-icon fas fa-search"></i>
+              <p>Search</p>
+            </a>
+          </li>
+
+          {% if request.user.is_staff %}
+          <li class="nav-header">ADMINISTRATION</li>
+
+          <li class="nav-item">
+            <a href="{% url 'settings_app:index' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'settings_app' %}active{% endif %}">
+              <i class="nav-icon fas fa-cog"></i>
+              <p>Settings</p>
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="{% url 'audit_logs:list' %}"
+               class="nav-link {% if request.resolver_match.app_name == 'audit_logs' %}active{% endif %}">
+              <i class="nav-icon fas fa-clipboard-list"></i>
+              <p>Audit Logs</p>
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="{% url 'admin:index' %}" class="nav-link">
+              <i class="nav-icon fas fa-tools"></i>
+              <p>Django Admin</p>
+            </a>
+          </li>
+          {% endif %}
+
+        </ul>
+      </nav>
+    </div>
+  </aside>
+  <!-- ═══════════════ / SIDEBAR ═══════════════ -->
+
+  <!-- ═══════════════ CONTENT ═══════════════ -->
+  <div class="content-wrapper">
+
+    <!-- Page header -->
+    <div class="content-header">
+      <div class="container-fluid">
+        <div class="row mb-2">
+          <div class="col-sm-6">
+            <h1 class="m-0">{% block page_title %}{% endblock %}</h1>
+          </div>
+          <div class="col-sm-6">
+            <ol class="breadcrumb float-sm-right">
+              <li class="breadcrumb-item">
+                <a href="{% url 'dashboard:index' %}">Home</a>
+              </li>
+              {% block breadcrumb_items %}{% endblock %}
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Django messages -->
+    {% if messages %}
+    <div class="container-fluid">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert">
+          <span>&times;</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Main content -->
+    <div class="content">
+      <div class="container-fluid">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+
+  </div>
+  <!-- ═══════════════ / CONTENT ═══════════════ -->
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <strong>KB Platform</strong> &mdash; Knowledge Management AI &copy; {% now "Y" %}
+    <div class="float-right d-none d-sm-inline-block">
+      <b>Version</b> 1.0.0-phase3
+    </div>
+  </footer>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div id="sidebar-overlay" data-widget="pushmenu"></div>
+
+</div><!-- /.wrapper -->
+
+<!-- ═══════════════ SCRIPTS ═══════════════ -->
+<!-- jQuery -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<!-- Bootstrap 4 -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- AdminLTE 3 -->
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<!-- OverlayScrollbars -->
+<script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@1.13.1/js/jquery.overlayScrollbars.min.js"></script>
+<!-- KB Platform -->
+<script src="{% static 'js/kb_platform.js' %}"></script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

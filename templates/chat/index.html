@@ -1,0 +1,109 @@
+{% extends "base/base.html" %}
+{% load static humanize %}
+
+{% block title %}Chat{% endblock %}
+{% block page_title %}AI Chat{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active">Chat</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+
+  <!-- Conversation list -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title"><i class="fas fa-comments mr-2 text-primary"></i>Conversations</h3>
+        <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#newChatModal">
+          <i class="fas fa-plus mr-1"></i>New Chat
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="thead-light">
+            <tr><th>Title</th><th>Knowledge Base</th><th>Messages</th><th>Last Activity</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for conv in page_obj %}
+            <tr>
+              <td>
+                <a href="{% url 'chat:conversation' conv.pk %}">
+                  <i class="fas fa-comment-dots mr-1 text-muted"></i>
+                  {{ conv.title|default:"Untitled Conversation"|truncatechars:55 }}
+                </a>
+                {% if conv.is_pinned %}<i class="fas fa-thumbtack text-warning ml-1"></i>{% endif %}
+              </td>
+              <td>
+                {% if conv.knowledge_base %}
+                <span class="badge badge-light">{{ conv.knowledge_base.name }}</span>
+                {% else %}<span class="text-muted small">All</span>{% endif %}
+              </td>
+              <td><span class="badge badge-secondary">{{ conv.message_count }}</span></td>
+              <td>
+                {% if conv.last_message_at %}
+                  <span title="{{ conv.last_message_at }}">{{ conv.last_message_at|timesince }} ago</span>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-right">
+                <a href="{% url 'chat:conversation' conv.pk %}" class="btn btn-xs btn-outline-primary">
+                  <i class="fas fa-comments"></i> Open
+                </a>
+                <form method="post" action="{% url 'chat:delete' conv.pk %}"
+                      style="display:inline"
+                      onsubmit="return confirm('Delete this conversation?')">
+                  {% csrf_token %}
+                  <button class="btn btn-xs btn-outline-danger"><i class="fas fa-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-5">
+              <i class="fas fa-comment-slash fa-3x mb-3 d-block"></i>
+              No conversations yet. Start one!
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick start panel -->
+  <div class="col-md-4">
+    <div class="card card-primary card-outline">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-rocket mr-2"></i>Quick Start</h3></div>
+      <div class="card-body">
+        <p class="text-muted small">Start a new AI chat session with your indexed documents.</p>
+        <form method="post" action="{% url 'chat:new' %}">
+          {% csrf_token %}
+          <div class="form-group">
+            <label>Knowledge Base</label>
+            <select name="knowledge_base_id" class="form-control form-control-sm">
+              <option value="">All knowledge bases</option>
+              {% for kb in knowledge_bases %}
+              <option value="{{ kb.pk }}">{{ kb.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            <i class="fas fa-comments mr-1"></i>Start New Chat
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card card-info card-outline">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-lightbulb mr-2"></i>Tips</h3></div>
+      <div class="card-body small text-muted">
+        <ul class="pl-3">
+          <li>Select a Knowledge Base to scope answers to specific documents.</li>
+          <li>Every answer includes citations — click them to see source text.</li>
+          <li>Conversations remember context for follow-up questions.</li>
+          <li>Ollama must be running: <code>ollama serve</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

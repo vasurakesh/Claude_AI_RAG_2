@@ -1,0 +1,166 @@
+{% extends "base/base.html" %}
+{% load static humanize %}
+
+{% block title %}Documents{% endblock %}
+{% block page_title %}Documents{% endblock %}
+{% block breadcrumb_items %}
+  <li class="breadcrumb-item active">Documents</li>
+{% endblock %}
+
+{% block content %}
+<!-- Filter bar -->
+<div class="card card-outline card-primary">
+  <div class="card-body py-2">
+    <form method="get" class="form-inline flex-wrap gap-2">
+      <input type="text" name="q" value="{{ request.GET.q }}"
+             class="form-control form-control-sm mr-2 mb-1" placeholder="Search…" style="width:200px">
+      <select name="status" class="form-control form-control-sm mr-2 mb-1">
+        <option value="">All statuses</option>
+        {% for val, label in search_form.status.field.choices %}
+          {% if val %}<option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>{% endif %}
+        {% endfor %}
+      </select>
+      <select name="kb" class="form-control form-control-sm mr-2 mb-1">
+        <option value="">All knowledge bases</option>
+        {% for kb in search_form.kb.field.queryset %}
+          <option value="{{ kb.pk }}" {% if request.GET.kb == kb.pk|stringformat:"s" %}selected{% endif %}>{{ kb.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-sm btn-primary mb-1"><i class="fas fa-search mr-1"></i>Filter</button>
+      <a href="{% url 'document_upload:list' %}" class="btn btn-sm btn-outline-secondary mb-1"><i class="fas fa-times mr-1"></i>Clear</a>
+      <a href="{% url 'document_upload:upload' %}" class="btn btn-sm btn-success mb-1 ml-auto">
+        <i class="fas fa-plus mr-1"></i>Upload
+      </a>
+    </form>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fas fa-file-alt mr-2 text-primary"></i>
+      {{ total|intcomma }} document{{ total|pluralize }}
+    </h3>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-striped mb-0">
+      <thead class="thead-light">
+        <tr>
+          <th>Title</th>
+          <th>Knowledge Base</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Size</th>
+          <th>Pages</th>
+          <th>Uploaded</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in page_obj %}
+        <tr id="doc-row-{{ doc.pk }}">
+          <td>
+            <a href="{% url 'document_upload:detail' doc.pk %}">
+              <i class="fas fa-file mr-1 text-muted"></i>{{ doc.title|truncatechars:55 }}
+            </a>
+            {% if doc.requires_ocr %}
+              <span class="badge badge-info ml-1" title="OCR processed"><i class="fas fa-eye"></i></span>
+            {% endif %}
+            {% if doc.parent_document %}
+              <span class="badge badge-secondary ml-1" title="Extracted from ZIP">ZIP</span>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-light">{{ doc.knowledge_base.name }}</span></td>
+          <td><span class="text-uppercase text-muted small">{{ doc.extension }}</span></td>
+          <td>
+            <span class="badge badge-{% if doc.status == 'indexed' %}success{% elif doc.status == 'failed' %}danger{% elif doc.status == 'pending' %}secondary{% elif doc.status == 'processing' %}warning{% else %}info{% endif %}"
+                  id="status-{{ doc.pk }}">
+              {% if doc.status in 'processing,ocr_required,extracting,chunking,embedding' %}
+              <i class="fas fa-spinner fa-spin mr-1"></i>
+              {% endif %}
+              {{ doc.get_status_display }}
+            </span>
+          </td>
+          <td>{{ doc.file_size|filesizeformat }}</td>
+          <td>{{ doc.page_count|default:"—" }}</td>
+          <td>
+            <span title="{{ doc.created_at }}">{{ doc.created_at|timesince }} ago</span>
+          </td>
+          <td class="text-right">
+            <a href="{% url 'document_upload:detail' doc.pk %}" class="btn btn-xs btn-outline-primary">
+              <i class="fas fa-eye"></i>
+            </a>
+            <form method="post" action="{% url 'document_upload:delete' doc.pk %}"
+                  style="display:inline"
+                  onsubmit="return confirm('Delete {{ doc.title|escapejs }}?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-xs btn-outline-danger">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-5">
+            <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
+            No documents found.
+            <a href="{% url 'document_upload:upload' %}">Upload your first document →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.has_other_pages %}
+  <div class="card-footer clearfix">
+    <ul class="pagination pagination-sm m-0 float-right">
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&status={{ request.GET.status }}&kb={{ request.GET.kb }}">«</a>
+      </li>
+      {% endif %}
+      <li class="page-item disabled">
+        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      </li>
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&status={{ request.GET.status }}&kb={{ request.GET.kb }}">»</a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Poll status for in-progress documents every 4 seconds
+const inProgress = [
+  {% for doc in page_obj %}
+    {% if doc.status in 'processing,ocr_required,extracting,chunking,embedding' %}'{{ doc.pk }}',{% endif %}
+  {% endfor %}
+];
+
+if (inProgress.length) {
+  const poll = setInterval(async () => {
+    for (const pk of inProgress) {
+      try {
+        const r = await fetch(`/documents/${pk}/status/`);
+        const d = await r.json();
+        const badge = document.getElementById(`status-${pk}`);
+        if (!badge) continue;
+        const done = d.is_indexed || d.failed;
+        badge.innerHTML = (done ? '' : '<i class="fas fa-spinner fa-spin mr-1"></i>') + d.status_label;
+        if (d.is_indexed) badge.className = 'badge badge-success';
+        if (d.failed)     badge.className = 'badge badge-danger';
+        if (done) inProgress.splice(inProgress.indexOf(pk), 1);
+      } catch(e) {}
+    }
+    if (!inProgress.length) clearInterval(poll);
+  }, 4000);
+}
+</script>
+{% endblock %}

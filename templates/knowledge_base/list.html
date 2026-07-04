@@ -1,0 +1,31 @@
+{% extends "base/base.html" %}
+{% block title %}Knowledge Bases{% endblock %}
+{% block page_title %}Knowledge Bases{% endblock %}
+{% block breadcrumb_items %}<li class="breadcrumb-item active">Knowledge Bases</li>{% endblock %}
+{% block content %}
+<div class="row">
+  {% for kb in knowledge_bases %}
+  <div class="col-md-4 mb-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title"><i class="fas fa-database mr-2 text-primary"></i>{{ kb.name }}</h5>
+        <p class="card-text text-muted">{{ kb.description|default:"No description." }}</p>
+        <div class="d-flex justify-content-between">
+          <a href="{% url 'document_upload:list' %}?kb={{ kb.pk }}" class="btn btn-sm btn-outline-primary">
+            <i class="fas fa-file-alt mr-1"></i>View Documents
+          </a>
+          <span class="badge badge-{% if kb.is_active %}success{% else %}secondary{% endif %} align-self-center">
+            {% if kb.is_active %}Active{% else %}Inactive{% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12 text-center py-5 text-muted">
+    <i class="fas fa-database fa-3x mb-3 d-block"></i>
+    No knowledge bases yet. Create one from <a href="{% url 'admin:knowledge_base_knowledgebase_add' %}">Django Admin</a>.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
