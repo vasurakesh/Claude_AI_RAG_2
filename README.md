@@ -196,3 +196,4 @@ embeddings/conversations, and migrations) can build directly on this skeleton.
 | Make migrations (Phase 2+) | `python manage.py makemigrations` |
 | Run tests (Phase 8+) | `pytest` |
 "# Claude_AI_RAG_2" 
+"# Claude_AI_RAG_2" 
