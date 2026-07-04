@@ -1,0 +1,8 @@
+:: Stage all files in the directory
+git add .
+
+:: Commit the files with a descriptive message
+git commit -m "Add full Django project structure and code"
+
+git push origin main
+
