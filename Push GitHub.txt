@@ -1,3 +1,15 @@
+echo "# Claude_AI_RAG_Final" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/vasurakesh/Claude_AI_RAG_Final.git
+git push -u origin main
+
+
+---------------------------
+
+
 :: Stage all files in the directory
 git add .
 
